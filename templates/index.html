@@ -1,0 +1,13 @@
+<{% extends "base.html" %}>
+<{% block content %}>
+    <h2>Enter your garment description</h2>
+    <form method="post" action="{{ url_for('generate') }}">
+        <textarea name="description" placeholder="e.g., a blue denim jacket with patches" required></textarea>
+        <h3>Style preference (optional)</h3>
+        <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual (optional)" />
+        <h3>Weather (optional)</h3>
+        <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy (optional)" />
+        <br>
+        <button type="submit">Generate images</button>
+    </form>
+<{% endblock %}>

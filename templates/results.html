@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Outfit suggestions</h2>
+    {% if selected_image %}
+    <div class="selected-image">
+        <img src="{{ url_for('static', filename=selected_image) }}" alt="Selected image">
+    </div>
+    {% endif %}
+    {% if session.style_preference or session.weather %}
+    <div class="context-info">
+        {% if session.style_preference %}<p><strong>Style preference:</strong> {{ session.style_preference }}</p>{% endif %}
+        {% if session.weather %}<p><strong>Weather:</strong> {{ session.weather }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <div class="suggestions">
+        {{ suggestions | safe }}
+    </div>
+    <a href="{{ url_for('index') }}" class="button">Start over</a>
+{% endblock %}

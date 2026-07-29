@@ -1,0 +1,17 @@
+<{% extends "base.html" %}>
+<{% block content %}>
+    <h2>Select the image that best matches your item</h2>
+    <form method="post" action="{{ url_for('suggestions') }}">
+        <div class="image-grid">
+            {% for img in images %}
+                <label>
+                    <input type="radio" name="selected_image" value="{{ img }}" {% if loop.first %}checked{% endif %}>
+                    <img src="{{ url_for('static', filename=img) }}" alt="Generated image {{ loop.index }}">
+                </label>
+            {% endfor %}
+        </div>
+        <!-- Two submit buttons distinguished by the same name 'mode' -->
+        <button type="submit" name="mode" value="vision">Continue with Vision</button>
+        <button type="submit" name="mode" value="text_only">Text Only</button>
+    </form>
+<{% endblock %}>

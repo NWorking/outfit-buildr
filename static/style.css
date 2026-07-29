@@ -1,0 +1,63 @@
+/* Minimal styling for the Outfit‑Buildr Flask app */
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f9f9;
+    color: #333;
+}
+.container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+h1, h2, h3 {
+    color: #2c3e50;
+}
+form textarea {
+    width: 100%;
+    height: 100px;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+}
+form button {
+    background-color: #3498db;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+form button:hover {
+    background-color: #2980b9;
+}
+.image-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+.image-grid label {
+    cursor: pointer;
+    text-align: center;
+}
+.image-grid img {
+    max-width: 180px;
+    height: auto;
+    border: 2px solid transparent;
+    border-radius: 4px;
+}
+.image-grid input:checked + img {
+    border-color: #3498db;
+}
+ul.suggestions {
+    list-style-type: disc;
+    margin-left: 1.5rem;
+}

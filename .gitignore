@@ -1,0 +1,29 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Byte‑code cache
+__pycache__/
+*.pyc
+
+# Project‑specific caches
+.image_cache/
+
+# Environment variable secrets
+.env
+.env.*
+
+# Claude‑Code workspace
+.claude/
+
+# Operating‑system / editor artifacts
+*.DS_Store
+Thumbs.db
+*.swp
+
+# Logs / temporary files
+*.log
+tmp/
+
+#images
+static/fashion/
