@@ -12,8 +12,24 @@
         {% if session.weather %}<p><strong>Weather:</strong> {{ session.weather }}</p>{% endif %}
     </div>
     {% endif %}
-    <div class="suggestions">
-        {{ suggestions | safe }}
+    <div class="suggestion-cards">
+        {% for suggestion in suggestions %}
+        <div class="outfit-card">
+            <h3>{{ suggestion.title }}</h3>
+            <p>{{ suggestion.reasoning }}</p>
+            <ul>
+                {% for piece in suggestion.pieces %}
+                <li>{{ piece }}</li>
+                {% endfor %}
+            </ul>
+            <form method="post" action="{{ url_for('visualize') }}">
+                <input type="hidden" name="suggestion_index" value="{{ loop.index0 }}" />
+                <button type="submit">Visualize</button>
+            </form>
+        </div>
+        {% endfor %}
     </div>
+    <h2>Time spent thinking</h2>
+    <p>{{thinking_time}} seconds</p>
     <a href="{{ url_for('index') }}" class="button">Start over</a>
 {% endblock %}

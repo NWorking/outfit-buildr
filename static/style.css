@@ -61,3 +61,16 @@ ul.suggestions {
     list-style-type: disc;
     margin-left: 1.5rem;
 }
+/* New styles for suggestion cards */
+.suggestion-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+.outfit-card {
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 1rem;
+    background-color: #fafafa;
+}
