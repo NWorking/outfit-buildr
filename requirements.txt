@@ -8,3 +8,4 @@ tqdm
 markdown
 #ollama==0.1.6
 ollama>=0.6.2
+groq

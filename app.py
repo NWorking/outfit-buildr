@@ -9,6 +9,13 @@ from flask import Flask, render_template, render_template_string, request, redir
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 from generate import generate_images
 
+from pydantic import BaseModel, ValidationError
+
+class Suggestion(BaseModel):
+    title: str
+    reasoning: str
+    pieces: list[str]
+
 # Helper to parse JSON responses from the LLM
 def _parse_json_response(content: str) -> list[dict]:
     """Extract a JSON array from the LLM output.
@@ -21,14 +28,15 @@ def _parse_json_response(content: str) -> list[dict]:
     cleaned = cleaned.strip()
     try:
         data = json.loads(cleaned)
-        if isinstance(data, list):
-            return data
-        else:
+        if isinstance(data, dict) and "suggestions" in data:
+            data = data["suggestions"]  # unwrap Groq's schema wrapper
+        if not isinstance(data, list):
             print('Unexpected JSON structure:', data)
             return []
-    except Exception as e:
-        print('JSON parse error:', e)
-        # Fallback: treat raw content as a single suggestion with the whole text as a piece
+        validated = [Suggestion.model_validate(item).model_dump() for item in data]
+        return validated
+    except (json.JSONDecodeError, ValidationError) as e:
+        print('JSON parse/validation error:', e)
         return [{"title": "Raw suggestion", "reasoning": "", "pieces": [cleaned]}]
 
 
@@ -131,53 +139,148 @@ def _build_text_prompt(description: str | None) -> str:
     return prompt
 
 
-def generate_outfit_suggestions(image_path: Path, description: str, schema:dict | None = None) -> list[dict]:
+def generate_outfit_suggestions(image_path: Path, description: str, schema:dict | None = None, provider: str = "ollama") -> list[dict]:
     """Generate outfit suggestions using Ollama's vision model.
     Returns a list of structured suggestion dictionaries.
     """
     prompt_text = _build_vision_prompt(description)
-    try:
-        precall_time = time.time()
-        response = ollama.chat(
-            model="qwen3-vl:2b",
-            messages=[{"role": "user", "content": prompt_text, "images": [Path(image_path)]}],
-            think=False,
-            format=schema,
-            options={"num_ctx": 8192}
-        )
-        postcall_time = time.time()
-        thinking_time = round(postcall_time - precall_time, 2)
-    except Exception as e:
-        raise RuntimeError(f"Ollama vision model call failed: {e}")
-    content = response.get("message", {}).get("content", "")
-    # Parse JSON output from LLM
-    suggestions = _parse_json_response(content)
-    return suggestions, thinking_time
+
+    if provider == "groq":
+        # Use Groq's text‑only API. Build the same prompt as the text‑only
+        # path (style and weather context are pulled inside _build_text_prompt)
+        # and request a JSON‑formatted response.
+        from groq import Groq
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY environment variable not set")
+        # Model choice – a fast, current chat model from Groq. Adjust if needed.
+        groq_model = "qwen/qwen3.6-27b"
+        prompt_text = _build_text_prompt(description)
+        try:
+            precall_time = time.time()
+            client = Groq(api_key=api_key)
+            response = client.chat.completions.create(
+                model=groq_model,
+                messages=[{"role": "user", "content": prompt_text}],
+                temperature=0.0,
+            )
+            postcall_time = time.time()
+            thinking_time = round(postcall_time - precall_time, 2)
+            # Extract the assistant message content
+            content = response.choices[0].message.content
+        except Exception as e:
+            raise RuntimeError(f"Groq API call failed: {e}")
+        # Parse the JSON output from the LLM (same as Ollama path)
+        suggestions = _parse_json_response(content)
+        return suggestions, thinking_time
+    
+    # Ollama
+    else:
+        try:
+            precall_time = time.time()
+            response = ollama.chat(
+                model="qwen3-vl:2b",
+                messages=[{"role": "user", "content": prompt_text, "images": [Path(image_path)]}],
+                think=False,
+                format=schema,
+                options={"num_ctx": 8192}
+            )
+            postcall_time = time.time()
+            thinking_time = round(postcall_time - precall_time, 2)
+        except Exception as e:
+            raise RuntimeError(f"Ollama vision model call failed: {e}")
+        content = response.get("message", {}).get("content", "")
+        # Parse JSON output from LLM
+        suggestions = _parse_json_response(content)
+        return suggestions, thinking_time
 
 
-def generate_text_only_suggestions(description: str, schema: dict | None = None) -> list[dict]:
+def generate_text_only_suggestions(description: str, schema: dict | None = None, provider="ollama") -> list[dict]:
     """Generate outfit suggestions using a text‑only prompt.
     Returns a list of structured suggestion dictionaries.
     """
     prompt_text = _build_text_prompt(description)
-    try:
-        precall_time = time.time()
-        response = ollama.chat(
-            model="qwen3-vl:2b",
-            messages=[{"role": "user", "content": prompt_text}],
-            think="low",
-            format=schema,
-            options={"num_ctx": 4096}
-        )
-        postcall_time = time.time()
-        thinking_time = round(postcall_time - precall_time, 2)
-        print("RAW RESPONSE:", response, flush=True)
-        print("TIME: ", thinking_time, flush = True)
-    except Exception as e:
-        raise RuntimeError(f"Ollama text‑only model call failed: {e}")
-    content = response.get("message", {}).get("content", "")
-    suggestions = _parse_json_response(content)
-    return suggestions, thinking_time
+    if provider == "groq":
+            # Use Groq's text‑only API. Build the same prompt as the text‑only
+            # path (style and weather context are pulled inside _build_text_prompt)
+            # and request a JSON‑formatted response.
+            from groq import Groq
+            api_key = os.getenv("GROQ_API_KEY")
+            if not api_key:
+                raise RuntimeError("GROQ_API_KEY environment variable not set")
+            # Model choice – a fast, current chat model from Groq. Adjust if needed.
+            groq_model = "openai/gpt-oss-20b"
+            
+            try:
+                precall_time = time.time()
+                client = Groq(api_key=api_key)
+                response = client.chat.completions.create(
+                    model=groq_model,
+                    messages=[{"role": "user", "content": prompt_text}],
+                    temperature=0.0,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "outfit_suggestions",
+                            "strict": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "suggestions": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "title": {"type": "string"},
+                                                "reasoning": {"type": "string"},
+                                                "pieces": {
+                                                    "type": "array",
+                                                    "items": {"type": "string"},
+                                                    "minItems": 2,
+                                                    "maxItems": 8
+                                                }
+                                            },
+                                            "required": ["title", "reasoning", "pieces"],
+                                            "additionalProperties": False
+                                        },
+                                        "minItems": 4,
+                                        "maxItems": 4
+                                    }
+                                },
+                                "required": ["suggestions"],
+                                "additionalProperties": False
+                            }
+                        }
+                    }
+                )
+                postcall_time = time.time()
+                thinking_time = round(postcall_time - precall_time, 2)
+                # Extract the assistant message content
+                content = response.choices[0].message.content
+            except Exception as e:
+                raise RuntimeError(f"Groq API call failed: {e}")
+            # Parse the JSON output from the LLM (same as Ollama path)
+            suggestions = _parse_json_response(content)
+            return suggestions, thinking_time
+    else:
+        try:
+            precall_time = time.time()
+            response = ollama.chat(
+                model="qwen3-vl:2b",
+                messages=[{"role": "user", "content": prompt_text}],
+                think="low",
+                format=schema,
+                options={"num_ctx": 8192}
+            )
+            postcall_time = time.time()
+            thinking_time = round(postcall_time - precall_time, 2)
+            print("RAW RESPONSE:", response, flush=True)
+            print("TIME: ", thinking_time, flush = True)
+        except Exception as e:
+            raise RuntimeError(f"Ollama text‑only model call failed: {e}")
+            content = response.get("message", {}).get("content", "")
+            suggestions = _parse_json_response(content)
+            return suggestions, thinking_time
 
 # Add a button on the select image page to add style/aesthetic description
 
@@ -296,7 +399,7 @@ def suggestions():
         if not description:
             flash("Description is required for text‑only suggestions.")
             return redirect(url_for("index"))
-        suggestions, thinking_time = generate_text_only_suggestions(description, schema)
+        suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="groq")
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
         # Text‑only mode does not have a selected image
