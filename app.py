@@ -5,9 +5,12 @@ import re
 import requests
 import time
 from pathlib import Path
+import base64
+import mimetypes
 from flask import Flask, render_template, render_template_string, request, redirect, url_for, session, flash
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 from generate import generate_images
+from groq import Groq
 
 from pydantic import BaseModel, ValidationError
 
@@ -51,6 +54,15 @@ def _clean_suggestions(content: str) -> list[str]:
             line = line.split(":", 1)[-1].strip()
         cleaned.append(line)
     return cleaned if cleaned else ["(No suggestions returned)"]
+
+
+def _encode_image(image_path) -> str:
+    mime_type, _ = mimetypes.guess_type(str(image_path))
+    if mime_type is None:
+        mime_type = "image/jpeg"  # fallback
+    with open(image_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    return f"data:{mime_type};base64,{b64}"
 
 
 def _build_vision_prompt(description: str | None) -> str:
@@ -125,16 +137,7 @@ def _build_text_prompt(description: str | None) -> str:
         "only list other items in the outfit you come up with that would be worn with the original garment.\n\n"
         "Respond with ONLY the JSON array, no other text before or after, "
         "no markdown code fences. Follow the format defined by schema."
-        # "Respond with ONLY a JSON array, no other text before or after, "
-        # "no markdown code fences. Follow this exact format:\n"
-        # '[\n'
-        # '  {"title": "xyz", "reasoning": "xyz", "pieces": '
-        # '["piece 1", "piece 2", "piece 3"]},\n'
-        # '  {"title": "...", "reasoning": "...", "pieces": ["...", "..."]}\n'
-        # ']\n'
-        # "Return exactly 4 objects in the array. Each object's \"pieces\" list "
-        # "should have 2-8 short, concrete, searchable item descriptions."
-        #"KEEP THINKING BRIEF. The most important thing is the correctly structured json output."
+        
     )
     return prompt
 
@@ -149,25 +152,51 @@ def generate_outfit_suggestions(image_path: Path, description: str, schema:dict 
         # Use Groq's text‑only API. Build the same prompt as the text‑only
         # path (style and weather context are pulled inside _build_text_prompt)
         # and request a JSON‑formatted response.
-        from groq import Groq
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise RuntimeError("GROQ_API_KEY environment variable not set")
-        # Model choice – a fast, current chat model from Groq. Adjust if needed.
-        groq_model = "qwen/qwen3.6-27b"
-        prompt_text = _build_text_prompt(description)
+        # Model choice – currently the only model from groq that supports image as input
+        prompt_text = _build_vision_prompt(description)
+        image_data_url = _encode_image(image_path)
         try:
             precall_time = time.time()
             client = Groq(api_key=api_key)
-            response = client.chat.completions.create(
-                model=groq_model,
-                messages=[{"role": "user", "content": prompt_text}],
-                temperature=0.0,
+            # Step 1: Vision model — no JSON constraint, just describe what it sees
+            vision_response = client.chat.completions.create(
+                model="qwen/qwen3.6-27b",   # currently the only model from groq that supports image as input
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": image_data_url
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt_text
+                        }
+                    ]
+                    }
+                ],
             )
             postcall_time = time.time()
             thinking_time = round(postcall_time - precall_time, 2)
             # Extract the assistant message content
-            content = response.choices[0].message.content
+            vision_description = vision_response.choices[0].message.content
+
+            # Step 2: Text model — strict schema enforcement, structures the description
+            structuring_response = client.chat.completions.create(
+                model="openai/gpt-oss-20b",
+                messages=[
+                    {"role": "system", "content": "Convert the following outfit descriptions into the required structured format."},
+                    {"role": "user", "content": vision_description}
+                ],
+                response_format=response_format,  # your strict json_schema format from before
+            )
+            content = structuring_response.choices[0].message.content
         except Exception as e:
             raise RuntimeError(f"Groq API call failed: {e}")
         # Parse the JSON output from the LLM (same as Ollama path)
@@ -180,7 +209,7 @@ def generate_outfit_suggestions(image_path: Path, description: str, schema:dict 
             precall_time = time.time()
             response = ollama.chat(
                 model="qwen3-vl:2b",
-                messages=[{"role": "user", "content": prompt_text, "images": [Path(image_path)]}],
+                messages=[{"role": "user", "content": prompt_text, "images": [str(image_path)]}],
                 think=False,
                 format=schema,
                 options={"num_ctx": 8192}
@@ -205,7 +234,6 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
             # Use Groq's text‑only API. Build the same prompt as the text‑only
             # path (style and weather context are pulled inside _build_text_prompt)
             # and request a JSON‑formatted response.
-            from groq import Groq
             api_key = os.getenv("GROQ_API_KEY")
             if not api_key:
                 raise RuntimeError("GROQ_API_KEY environment variable not set")
@@ -359,7 +387,7 @@ def suggestions():
         if not description:
             flash("Description is required for text‑only suggestions.")
             return redirect(url_for("index"))
-        suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="groq", response_format=response_format)
+        suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="ollama", response_format=response_format)
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
         # Text‑only mode does not have a selected image
@@ -371,7 +399,7 @@ def suggestions():
             return redirect(url_for("index"))
         session["selected_image"] = selected_image
         image_path = Path(IMAGE_STATIC_DIR) / selected_image
-        suggestions, thinking_time = generate_outfit_suggestions(image_path, description if description else None, schema=schema, provider="groq")
+        suggestions, thinking_time = generate_outfit_suggestions(image_path, description if description else None, schema=schema, provider="groq", response_format=response_format)
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
     # Render results page with suggestions (and optional selected image)
