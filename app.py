@@ -335,53 +335,6 @@ def generate():
     session["images"] = images
     return render_template("choose_image.html", images=images)
 
-def call_anthropic_llm(description: str) -> list[str]:
-    """Call the Anthropic-compatible API to get outfit suggestions.
-
-    Returns a list of suggestion strings. If the API call fails, returns a
-    single‑element list with an error message.
-    """
-    base_url = os.getenv("ANTHROPIC_BASE_URL")
-    model = os.getenv("ANTHROPIC_MODEL")
-    if not base_url or not model:
-        return ["Anthropic API configuration is missing. Ensure ANTHROPIC_BASE_URL and ANTHROPIC_MODEL are set."]
-    # Build the request payload.
-    payload = {
-        "model": model,
-        "max_tokens": 1024,
-        "messages": [
-            {
-                "role": "user",
-                "content": (
-                    f"Give me 3-4 outfit suggestions for the following garment description: '{description}'. "
-                    "Return each suggestion as a separate short sentence."
-                ),
-            }
-        ],
-    }
-    try:
-        response = requests.post(f"{base_url.rstrip('/')}/v1/messages", json=payload, timeout=15)
-        response.raise_for_status()
-        data = response.json()
-        # Anthropic response format includes a "content" list with a dict containing "text".
-        content_items = data.get("content", [])
-        suggestions_text = ""
-        for item in content_items:
-            if isinstance(item, dict) and item.get("type") == "text":
-                suggestions_text += item.get("text", "")
-        # Split suggestions by lines or numbered list.
-        lines = [line.strip() for line in suggestions_text.strip().splitlines() if line.strip()]
-        # Remove numbering if present (e.g., "1. Something")
-        cleaned = []
-        for line in lines:
-            if line and line[0].isdigit() and (len(line) > 1 and line[1] in ".: "):
-                # Strip leading number and punctuation.
-                line = line.split(".", 1)[-1].strip()
-                line = line.split(":", 1)[-1].strip()
-            cleaned.append(line)
-        return cleaned if cleaned else ["(No suggestions returned)"]
-    except Exception as e:
-        return [f"Error contacting Anthropic API: {e}"]
 
 @app.route("/suggestions", methods=["POST"])
 def suggestions():
@@ -411,7 +364,7 @@ def suggestions():
             return redirect(url_for("index"))
         session["selected_image"] = selected_image
         image_path = Path(IMAGE_STATIC_DIR) / selected_image
-        suggestions, thinking_time = generate_outfit_suggestions(image_path, description if description else None, schema=schema)
+        suggestions, thinking_time = generate_outfit_suggestions(image_path, description if description else None, schema=schema, provider="groq")
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
     # Render results page with suggestions (and optional selected image)
