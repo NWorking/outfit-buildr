@@ -139,7 +139,7 @@ def _build_text_prompt(description: str | None) -> str:
     return prompt
 
 
-def generate_outfit_suggestions(image_path: Path, description: str, schema:dict | None = None, provider: str = "ollama") -> list[dict]:
+def generate_outfit_suggestions(image_path: Path, description: str, schema:dict | None = None, provider: str = "ollama", response_format: dict | None = None) -> list[dict]:
     """Generate outfit suggestions using Ollama's vision model.
     Returns a list of structured suggestion dictionaries.
     """
@@ -193,13 +193,14 @@ def generate_outfit_suggestions(image_path: Path, description: str, schema:dict 
         # Parse JSON output from LLM
         suggestions = _parse_json_response(content)
         return suggestions, thinking_time
+        
 
-
-def generate_text_only_suggestions(description: str, schema: dict | None = None, provider="ollama") -> list[dict]:
+def generate_text_only_suggestions(description: str, schema: dict | None = None, provider="ollama", response_format: dict | None = None) -> list[dict]:
     """Generate outfit suggestions using a text‑only prompt.
     Returns a list of structured suggestion dictionaries.
     """
     prompt_text = _build_text_prompt(description)
+
     if provider == "groq":
             # Use Groq's text‑only API. Build the same prompt as the text‑only
             # path (style and weather context are pulled inside _build_text_prompt)
@@ -218,40 +219,7 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
                     model=groq_model,
                     messages=[{"role": "user", "content": prompt_text}],
                     temperature=0.0,
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": "outfit_suggestions",
-                            "strict": True,
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "suggestions": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "title": {"type": "string"},
-                                                "reasoning": {"type": "string"},
-                                                "pieces": {
-                                                    "type": "array",
-                                                    "items": {"type": "string"},
-                                                    "minItems": 2,
-                                                    "maxItems": 8
-                                                }
-                                            },
-                                            "required": ["title", "reasoning", "pieces"],
-                                            "additionalProperties": False
-                                        },
-                                        "minItems": 4,
-                                        "maxItems": 4
-                                    }
-                                },
-                                "required": ["suggestions"],
-                                "additionalProperties": False
-                            }
-                        }
-                    }
+                    response_format=response_format,
                 )
                 postcall_time = time.time()
                 thinking_time = round(postcall_time - precall_time, 2)
@@ -262,6 +230,7 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
             # Parse the JSON output from the LLM (same as Ollama path)
             suggestions = _parse_json_response(content)
             return suggestions, thinking_time
+    # Ollama
     else:
         try:
             precall_time = time.time()
@@ -278,9 +247,9 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
             print("TIME: ", thinking_time, flush = True)
         except Exception as e:
             raise RuntimeError(f"Ollama text‑only model call failed: {e}")
-            content = response.get("message", {}).get("content", "")
-            suggestions = _parse_json_response(content)
-            return suggestions, thinking_time
+        content = response.get("message", {}).get("content", "")
+        suggestions = _parse_json_response(content)
+        return suggestions, thinking_time
 
 # Add a button on the select image page to add style/aesthetic description
 
@@ -294,6 +263,44 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 # Ensure session works – set permanent session.
 app.config["SESSION_PERMANENT"] = False
 
+# Groq JSON output enforcer - only compatible with a few models (none support image input)
+# compatible models: https://console.groq.com/docs/structured-outputs
+response_format={
+    "type": "json_schema",
+    "json_schema": {
+        "name": "outfit_suggestions",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "title": {"type": "string"},
+                            "reasoning": {"type": "string"},
+                            "pieces": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "minItems": 2,
+                                "maxItems": 8
+                            }
+                        },
+                        "required": ["title", "reasoning", "pieces"],
+                        "additionalProperties": False
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                }
+            },
+            "required": ["suggestions"],
+            "additionalProperties": False
+        }
+    }
+    }
+
+# Passes into Ollama's format parameter
 schema = {
     "type": "array",
     "items": {
@@ -352,7 +359,7 @@ def suggestions():
         if not description:
             flash("Description is required for text‑only suggestions.")
             return redirect(url_for("index"))
-        suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="groq")
+        suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="groq", response_format=response_format)
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
         # Text‑only mode does not have a selected image
