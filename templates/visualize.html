@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+    <h2>Visualization for {{ suggestion.title }}</h2>
+    {% if session.selected_image %}
+    <div class="selected-garment" style="margin-bottom:1rem; text-align:center;">
+        <p><strong>Original Garment</strong></p>
+        <img src="{{ url_for('static', filename=session.selected_image) }}" alt="Selected garment" style="max-width:400px; height:auto;"/>
+    </div>
+    {% endif %}
+    {% if session.style_preference or session.weather %}
+    <div class="context-info">
+        {% if session.style_preference %}<p><strong>Style preference:</strong> {{ session.style_preference }}</p>{% endif %}
+        {% if session.weather %}<p><strong>Weather:</strong> {{ session.weather }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <div class="visual-grid" style="display:flex;flex-wrap:wrap;gap:1rem;">
+        {% for item in items %}
+        <div class="visual-item" style="flex:1 1 200px; text-align:center;">
+            <p><strong>{{ item.piece }}</strong></p>
+            {% if item.image %}
+                <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
+            {% else %}
+                <p>No image found</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <a href="{{ url_for('index') }}" class="button">Start over</a>
+{% endblock %}

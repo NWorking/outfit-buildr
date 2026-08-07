@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 import base64
 import mimetypes
-from flask import Flask, render_template, render_template_string, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 from generate import generate_images
 from groq import Groq
@@ -411,31 +411,6 @@ def suggestions():
     )
 
 # Visualization route
-visualize_template = """
-{% extends \"base.html\" %}
-{% block content %}
-    <h2>Visualization for {{ suggestion.title }}</h2>
-    {% if session.style_preference or session.weather %}
-    <div class="context-info">
-        {% if session.style_preference %}<p><strong>Style preference:</strong> {{ session.style_preference }}</p>{% endif %}
-        {% if session.weather %}<p><strong>Weather:</strong> {{ session.weather }}</p>{% endif %}
-    </div>
-    {% endif %}
-    <div class="visual-grid" style="display:flex;flex-wrap:wrap;gap:1rem;">
-        {% for item in items %}
-        <div class="visual-item" style="flex:1 1 200px; text-align:center;">
-            <p><strong>{{ item.piece }}</strong></p>
-            {% if item.image %}
-            <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
-            {% else %}
-            <p>No image found</p>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    <a href="{{ url_for('index') }}" class="button">Start over</a>
-{% endblock %}
-"""
 
 @app.route("/visualize", methods=["POST"])
 def visualize():
@@ -456,7 +431,7 @@ def visualize():
         top = get_top_images(piece, top_k=1)
         image = top[0] if top else None
         items.append({"piece": piece, "image": image})
-    return render_template_string(visualize_template, suggestion=suggestion, items=items)
+    return render_template("visualize.html", suggestion=suggestion, items=items)
 
 if __name__ == "__main__":
     # Run on default Flask port.
