@@ -142,7 +142,7 @@ def _build_text_prompt(description: str | None) -> str:
     return prompt
 
 
-def generate_outfit_suggestions(image_path: Path, description: str, schema:dict | None = None, provider: str = "ollama", response_format: dict | None = None) -> list[dict]:
+def generate_outfit_suggestions(image_path: Path | None = None, description: str = "", schema:dict | None = None, provider: str = "ollama", response_format: dict | None = None, image_b64: str | None = None) -> tuple[list[dict], float]:
     """Generate outfit suggestions using Ollama's vision model.
     Returns a list of structured suggestion dictionaries.
     """
@@ -157,7 +157,12 @@ def generate_outfit_suggestions(image_path: Path, description: str, schema:dict 
             raise RuntimeError("GROQ_API_KEY environment variable not set")
         # Model choice – currently the only model from groq that supports image as input
         prompt_text = _build_vision_prompt(description)
-        image_data_url = _encode_image(image_path)
+        if image_path is not None:
+            image_data_url = _encode_image(image_path)
+        elif image_b64 is not None:
+            image_data_url = image_b64
+        else:
+            raise RuntimeError("No image data provided for vision model")
         try:
             precall_time = time.time()
             client = Groq(api_key=api_key)
@@ -290,6 +295,9 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 
 # Ensure session works – set permanent session.
 app.config["SESSION_PERMANENT"] = False
+# Limit upload size to 5 MB to prevent excessive memory usage.
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB
+
 
 # Groq JSON output enforcer - only compatible with a few models (none support image input)
 # compatible models: https://console.groq.com/docs/structured-outputs
@@ -410,7 +418,57 @@ def suggestions():
         thinking_time = thinking_time,
     )
 
-# Visualization route
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    flash("Uploaded file is too large (max 5 MB).")
+    return redirect(url_for('index'))
+
+@app.route("/upload_suggestions", methods=["POST"])
+def upload_suggestions():
+    # Handle direct image upload, bypassing CLIP candidate selection.
+    uploaded_file = request.files.get("photo")
+    if not uploaded_file:
+        flash("No image file uploaded.")
+        return redirect(url_for("index"))
+    # Validate MIME type is an image.
+    if not uploaded_file.mimetype or not uploaded_file.mimetype.startswith('image/'):
+        flash("Uploaded file must be an image.")
+        return redirect(url_for("index"))
+    # Read file bytes into memory and base64‑encode.
+    file_bytes = uploaded_file.read()
+    if not file_bytes:
+        flash("Uploaded image is empty.")
+        return redirect(url_for("index"))
+    b64_str = base64.b64encode(file_bytes).decode('utf-8')
+    # Build data URI for LLM (Groq vision model expects a data URL).
+    image_data_uri = f"data:{uploaded_file.mimetype};base64,{b64_str}"
+    # Preserve optional style and weather fields.
+    style_preference = request.form.get('style_preference', '').strip()
+    weather = request.form.get('weather', '').strip()
+    session['style_preference'] = style_preference
+    session['weather'] = weather
+    # No textual description needed for pure image upload.
+    description = ''
+    # Call vision model via Groq (provider='groq') – it supports image data URIs.
+    suggestions, thinking_time = generate_outfit_suggestions(
+        image_path=None,
+        description=description,
+        schema=schema,
+        provider='groq',
+        response_format=response_format,
+        image_b64=image_data_uri,
+    )
+    # Store suggestions for later visualization.
+    session['outfit_suggestions'] = suggestions
+    # Render results directly, passing the base64 string for display.
+    return render_template(
+        'results.html',
+        selected_image=None,
+        uploaded_image_b64=b64_str,
+        suggestions=suggestions,
+        thinking_time=thinking_time,
+    )
+
 
 @app.route("/visualize", methods=["POST"])
 def visualize():
@@ -431,7 +489,13 @@ def visualize():
         top = get_top_images(piece, top_k=1)
         image = top[0] if top else None
         items.append({"piece": piece, "image": image})
-    return render_template("visualize.html", suggestion=suggestion, items=items)
+    uploaded_image_b64 = request.form.get('uploaded_image_b64')
+    return render_template(
+        "visualize.html",
+        suggestion=suggestion,
+        items=items,
+        uploaded_image_b64=uploaded_image_b64,
+    )
 
 if __name__ == "__main__":
     # Run on default Flask port.

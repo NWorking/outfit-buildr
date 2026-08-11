@@ -7,12 +7,18 @@
         <img src="{{ url_for('static', filename=session.selected_image) }}" alt="Selected garment" style="max-width:400px; height:auto;"/>
     </div>
     {% endif %}
-    {% if session.style_preference or session.weather %}
-    <div class="context-info">
-        {% if session.style_preference %}<p><strong>Style preference:</strong> {{ session.style_preference }}</p>{% endif %}
-        {% if session.weather %}<p><strong>Weather:</strong> {{ session.weather }}</p>{% endif %}
+    {% if uploaded_image_b64 %}
+    <div class="selected-garment" style="margin-bottom:1rem; text-align:center;">
+        <p><strong>Original Garment</strong></p>
+        <img src="data:image/jpeg;base64,{{ uploaded_image_b64 }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
     </div>
     {% endif %}
+    {% if session.uploaded_image_b64 %}
+    <div class="selected-image" style="margin-bottom:1rem; text-align:center;">
+        <img src="data:image/jpeg;base64,{{ uploaded_image_b64 }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
+    </div>
+    {% endif %}
+    
     <div class="visual-grid" style="display:flex;flex-wrap:wrap;gap:1rem;">
         {% for item in items %}
         <div class="visual-item" style="flex:1 1 200px; text-align:center;">
@@ -25,5 +31,11 @@
         </div>
         {% endfor %}
     </div>
+    {% if session.style_preference or session.weather %}
+    <div class="context-info">
+        {% if session.style_preference %}<p><strong>Style preference:</strong> {{ session.style_preference }}</p>{% endif %}
+        {% if session.weather %}<p><strong>Weather:</strong> {{ session.weather }}</p>{% endif %}
+    </div>
+    {% endif %}
     <a href="{{ url_for('index') }}" class="button">Start over</a>
 {% endblock %}

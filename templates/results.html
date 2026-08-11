@@ -6,6 +6,11 @@
         <img src="{{ url_for('static', filename=selected_image) }}" alt="Selected image">
     </div>
     {% endif %}
+    {% if uploaded_image_b64 %}
+    <div class="selected-image">
+        <img src="data:image/jpeg;base64,{{ uploaded_image_b64 }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
+    </div>
+    {% endif %}
     {% if session.style_preference or session.weather %}
     <div class="context-info">
         {% if session.style_preference %}<p><strong>Style preference:</strong> {{ session.style_preference }}</p>{% endif %}
@@ -23,6 +28,9 @@
                 {% endfor %}
             </ul>
             <form method="post" action="{{ url_for('visualize') }}">
+                {% if uploaded_image_b64 %}
+                <input type="hidden" name="uploaded_image_b64" value="{{ uploaded_image_b64 }}" />
+                {% endif %}
                 <input type="hidden" name="suggestion_index" value="{{ loop.index0 }}" />
                 <button type="submit">Visualize</button>
             </form>

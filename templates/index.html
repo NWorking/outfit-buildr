@@ -10,4 +10,16 @@
         <br>
         <button type="submit">Generate images</button>
     </form>
+
+    <hr>
+    <h2>Or upload a photo of your garment</h2>
+    <form method="post" action="{{ url_for('upload_suggestions') }}" enctype="multipart/form-data">
+        <input type="file" name="photo" accept="image/*" required />
+        <h3>Style preference (optional)</h3>
+        <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual (optional)" />
+        <h3>Weather (optional)</h3>
+        <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy (optional)" />
+        <br>
+        <button type="submit">Get outfit suggestions</button>
+    </form>
 <{% endblock %}>
