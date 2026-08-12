@@ -9,7 +9,7 @@ import base64
 import mimetypes
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
-from generate import generate_images
+from image_retrieval import get_top_images as generate_images
 from groq import Groq
 
 from pydantic import BaseModel, ValidationError

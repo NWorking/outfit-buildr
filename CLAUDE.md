@@ -22,7 +22,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Sets up a Flask app, defines routes, manages session state, and calls the LLM.
   - Routes:
     - `GET /` – renders the description entry page.
-    - `POST /generate` – stores the user description, calls `generate_images`, and presents four image choices.
+    - `POST /generate` – stores the user description, calls `image_retrieval.get_top_images` (imported as `generate_images`) and presents four image choices.
     - `POST /suggestions` – stores the selected image, calls the local Ollama vision model (qwen3-vl:4b) for outfit suggestions, and renders the results.
 - Requires the Ollama server to be running locally and the model pulled (`ollama pull qwen3-vl:4b`).
 
@@ -32,8 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Provides `get_top_images(description, top_k=4)` which encodes the user description with the same CLIP model, performs a cosine‑similarity lookup, and returns the four most similar image paths (relative to the Flask `static/` folder).
   - Includes a legacy‑format fallback: if `paths.pt` is a pickled list (from an older version), it loads via `torch.load` and rewrites it as JSON for future runs.
 
-- **Generate wrapper (`generate.py`)**
-  - Exposes a thin wrapper `generate_images(description)` that forwards the call to `image_retrieval.get_top_images`. This keeps the Flask route signature unchanged while allowing the heavy retrieval logic to evolve independently.
+- **Note**: `generate.py` has been removed; the Flask app now imports `image_retrieval.get_top_images` directly (aliased as `generate_images`).
 
 - **Static assets**
   - `static/style.css` – minimal styling for the pages.

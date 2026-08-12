@@ -16,34 +16,36 @@
 .tabcontent {
   margin-top: 1rem;
 }
+
+input[name="style_preference"], input[name="weather"] { width: 300px; }
 </style>
 
 <div class="tab-container">
-    <button class="tablink" onclick="openTab(event, 'upload')">Upload photo</button>
-    <button class="tablink active" onclick="openTab(event, 'desc')">Enter description</button>
+    <button class="tablink active" onclick="openTab(event, 'upload')">Upload photo</button>
+    <button class="tablink" onclick="openTab(event, 'desc')">Enter description</button>
 </div>
 
-<div id="upload" class="tabcontent" style="display: none;">
+<div id="upload" class="tabcontent" style="display: block;">
   <h2>Upload a photo of your garment</h2>
   <form method="post" action="{{ url_for('upload_suggestions') }}" enctype="multipart/form-data">
     <input type="file" name="photo" accept="image/*" required />
     <h3>Style preference (optional)</h3>
-    <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual (optional)" />
+    <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
     <h3>Weather (optional)</h3>
-    <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy (optional)" />
+    <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy" />
     <br>
     <button type="submit">Get outfit suggestions</button>
   </form>
 </div>
 
-<div id="desc" class="tabcontent" style="display: block;">
+<div id="desc" class="tabcontent" style="display: none;">
   <h2>Enter your garment description</h2>
   <form method="post" action="{{ url_for('generate') }}">
     <textarea name="description" placeholder="e.g., a blue denim jacket with patches" required></textarea>
     <h3>Style preference (optional)</h3>
-    <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual (optional)" />
+    <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
     <h3>Weather (optional)</h3>
-    <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy (optional)" />
+    <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy" />
     <br>
     <button type="submit">Generate images</button>
   </form>
