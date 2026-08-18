@@ -1,42 +1,108 @@
 /* Minimal styling for the Outfit‑Buildr Flask app */
+:root {
+    --color-primary: #be0429; /* crimson */
+    --color-bg: #111111; /* dark background */
+    --color-bg-container: #222222; /* container background */
+    --color-text: #eeeeee; /* light text */
+    --color-card-bg: #2a2a2a; /* cards */
+    --color-nav-link: #dddddd;
+    --color-nav-link-hover: var(--color-primary);
+    --color-nav-active: var(--color-primary);
+}
+
 body {
     font-family: Arial, Helvetica, sans-serif;
     margin: 0;
     padding: 0;
-    background-color: #f9f9f9;
-    color: #333;
+    background-color: var(--color-bg);
+    color: var(--color-text);
 }
 .container {
     max-width: 800px;
     margin: 2rem auto;
     padding: 1rem;
-    background-color: #fff;
+    background-color: var(--color-bg-container);
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
+/* Header / Nav */
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+.logo {
+    height: 40px;
+}
+.site-nav .nav-link {
+    color: var(--color-nav-link);
+    margin-left: 1rem;
+    text-decoration: none;
+    font-weight: 500;
+}
+.site-nav .nav-link:hover {
+    color: var(--color-nav-link-hover);
+}
+.site-nav .nav-link.active {
+    color: var(--color-nav-active);
+    font-weight: 600;
+}
+
 h1, h2, h3 {
-    color: #2c3e50;
+    color: var(--color-primary);
 }
+
 form textarea {
     width: 100%;
     height: 100px;
     padding: 0.5rem;
     margin-bottom: 1rem;
-    border: 1px solid #ccc;
+    border: 1px solid #444;
     border-radius: 4px;
+    background-color: #333;
+    color: var(--color-text);
     resize: vertical;
 }
-form button {
-    background-color: #3498db;
+form input[type="text"] {
+    width: 300px;
+    padding: 0.4rem;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background-color: #333;
+    color: var(--color-text);
+    margin-bottom: 0.5rem;
+}
+form button, .btn-primary {
+    background-color: var(--color-primary);
     color: #fff;
     border: none;
     padding: 0.5rem 1rem;
     border-radius: 4px;
     cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
 }
-form button:hover {
-    background-color: #2980b9;
+form button:hover, .btn-primary:hover {
+    background-color: #a5002d; /* darker crimson */
 }
+
+/* Hero */
+.hero {
+    text-align: center;
+    padding: 2rem 0;
+    color: var(--color-primary);
+}
+.hero-title {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+.hero-subtitle {
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+
+/* Image grid (existing) */
 .image-grid {
     display: flex;
     flex-wrap: wrap;
@@ -55,13 +121,10 @@ form button:hover {
     border-radius: 4px;
 }
 .image-grid input:checked + img {
-    border-color: #3498db;
+    border-color: var(--color-primary);
 }
-ul.suggestions {
-    list-style-type: disc;
-    margin-left: 1.5rem;
-}
-/* New styles for suggestion cards */
+
+/* Suggestion cards */
 .suggestion-cards {
     display: flex;
     flex-direction: column;
@@ -69,8 +132,47 @@ ul.suggestions {
     margin-top: 1rem;
 }
 .outfit-card {
-    border: 1px solid #ddd;
+    border: 1px solid #444;
     border-radius: 6px;
     padding: 1rem;
-    background-color: #fafafa;
+    background-color: var(--color-card-bg);
+    color: var(--color-text);
+}
+
+/* Utility */
+.button {
+    background-color: var(--color-primary);
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-decoration: none;
+    display: inline-block;
+}
+.button:hover { background-color: #a5002d; }
+
+/* Spinner */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    display: none;
+}
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--color-primary);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }

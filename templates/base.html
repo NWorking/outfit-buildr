@@ -4,11 +4,30 @@
     <meta charset="utf-8">
     <title>Outfit‑Buildr</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/png">
 </head>
 <body>
     <div class="container">
-        <h1>Outfit‑Buildr</h1>
+        <header class="site-header">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo"/>
+            <nav class="site-nav">
+                <a href="{{ url_for('index') }}" class="nav-link active">Home</a>
+                <a href="#" class="nav-link">About</a>
+            </nav>
+        </header>
         {% block content %}{% endblock %}
     </div>
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+    </div>
+    <script>
+    // Show spinner on any form submit
+    document.addEventListener('submit', function(e) {
+        var overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+    });
+    </script>
 </body>
 </html>

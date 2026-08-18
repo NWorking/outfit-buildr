@@ -1,71 +1,114 @@
 {% extends "base.html" %}
+
 {% block content %}
-<style>
-.tablink {
-  background-color: #f1f1f1;
-  border: none;
-  outline: none;
-  cursor: pointer;
-  padding: 10px 20px;
-  font-size: 16px;
-  margin-right: 5px;
-}
-.tablink.active {
-  background-color: #ccc;
-}
-.tabcontent {
-  margin-top: 1rem;
-}
 
-input[name="style_preference"], input[name="weather"] { width: 300px; }
-</style>
-
-<div class="tab-container">
-    <button class="tablink active" onclick="openTab(event, 'upload')">Upload photo</button>
-    <button class="tablink" onclick="openTab(event, 'desc')">Enter description</button>
+<div class="hero" id="hero">
+    <h2 class="hero-title">Find Your Perfect Outfit</h2>
+    <p class="hero-subtitle">
+      Describe your garment or upload a photo and let AI style you.
+    </p>
+    <a href="#form-section" class="btn-primary">Get Started</a>
 </div>
 
-<div id="upload" class="tabcontent" style="display: block;">
-  <h2>Upload a photo of your garment</h2>
-  <form method="post" action="{{ url_for('upload_suggestions') }}" enctype="multipart/form-data">
-    <input type="file" name="photo" accept="image/*" required />
-    <h3>Style preference (optional)</h3>
-    <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
-    <h3>Weather (optional)</h3>
-    <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy" />
-    <br>
-    <button type="submit">Get outfit suggestions</button>
-  </form>
+<div id="form-section">
+
+  <style>
+    .tablink {
+        background-color: #f1f1f1;
+        border: none;
+        outline: none;
+        cursor: pointer;
+        padding: 10px 20px;
+        font-size: 16px;
+        margin-right: 5px;
+    }
+    .tablink.active {
+      background-color: #ccc;
+    }
+    .tabcontent {
+      margin-top: 1rem;
+    }
+
+    input[name="style_preference"], 
+    input[name="weather"] { width: 300px; }
+  </style>
+
+  <div class="tab-container">
+      <button class="tablink active" onclick="openTab(event, 'upload')">Upload photo</button>
+      <button class="tablink" onclick="openTab(event, 'desc')">Enter description</button>
+  </div>
+
+  <div id="upload" class="tabcontent" style="display: block;">
+    <h2>Upload a photo of your garment</h2>
+    <form method="post" action="{{ url_for('upload_suggestions') }}" enctype="multipart/form-data">
+      <input type="file" name="photo" id="photo" accept="image/*" required />
+<img id="photo-preview" src="#" alt="Preview" style="display:none; max-width:200px; margin-top:10px;" />
+      <h3>Style preference (optional)</h3>
+      <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
+      <h3>Weather (optional)</h3>
+      <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy" />
+      <br>
+      <button type="submit">Get outfit suggestions</button>
+    </form>
+  </div>
+
+  <div id="desc" class="tabcontent" style="display: none;">
+    <h2>Enter your garment description</h2>
+    <form method="post" action="{{ url_for('generate') }}">
+      <textarea name="description" placeholder="e.g., a blue denim jacket with patches" required></textarea>
+      <h3>Style preference (optional)</h3>
+      <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
+      <h3>Weather (optional)</h3>
+      <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy" />
+      <br>
+      <button type="submit">Generate images</button>
+    </form>
+  </div>
+
+
+
 </div>
-
-<div id="desc" class="tabcontent" style="display: none;">
-  <h2>Enter your garment description</h2>
-  <form method="post" action="{{ url_for('generate') }}">
-    <textarea name="description" placeholder="e.g., a blue denim jacket with patches" required></textarea>
-    <h3>Style preference (optional)</h3>
-    <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
-    <h3>Weather (optional)</h3>
-    <input type="text" name="weather" placeholder="e.g. 75°F and sunny, cold and rainy" />
-    <br>
-    <button type="submit">Generate images</button>
-  </form>
-</div>
-
-
 
 <script>
 function openTab(evt, tabName) {
-  var i, tabcontent, tablinks;
-  tabcontent = document.getElementsByClassName('tabcontent');
-  for (i = 0; i < tabcontent.length; i++) {
-    tabcontent[i].style.display = 'none';
-  }
-  tablinks = document.getElementsByClassName('tablink');
-  for (i = 0; i < tablinks.length; i++) {
-    tablinks[i].classList.remove('active');
-  }
-  document.getElementById(tabName).style.display = 'block';
-  evt.currentTarget.classList.add('active');
+    var i, tabcontent, tablinks;
+    tabcontent = document.getElementsByClassName('tabcontent');
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = 'none';
+    }
+    tablinks = document.getElementsByClassName('tablink');
+    for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].classList.remove('active');
+    }
+    document.getElementById(tabName).style.display = 'block';
+    evt.currentTarget.classList.add('active');
 }
+
+// Photo preview
+document.addEventListener('DOMContentLoaded', function () {
+    var photoInput = document.getElementById('photo');
+    var previewImg = document.getElementById('photo-preview');
+    if (photoInput && previewImg) {
+        photoInput.addEventListener('change', function (event) {
+            var file = event.target.files[0];
+            if (!file) {
+                previewImg.style.display = 'none';
+                previewImg.src = '#';
+                return;
+            }
+            if (!file.type.startsWith('image/')) {
+                previewImg.style.display = 'none';
+                previewImg.src = '#';
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                previewImg.src = e.target.result;
+                previewImg.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+});
 </script>
 {% endblock %}
