@@ -498,6 +498,10 @@ def visualize():
         uploaded_image_b64=uploaded_image_b64,
     )
 
+@app.route("/about")
+def about():
+    return render_template('about.html')
+
 if __name__ == "__main__":
     # Run on default Flask port.
     app.run(debug=True)
