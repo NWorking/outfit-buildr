@@ -86,7 +86,7 @@ def _build_vision_prompt(description: str | None) -> str:
     else:
         prompt = (
             "Identify the garment shown in the image (type, color, style, notable details) "
-            "and then suggest 3‑4 outfit pieces that would match it."
+            "and then suggest outfit pieces that would match it."
         )
     # Append optional style and weather contexts.
     if style:
@@ -169,6 +169,7 @@ def generate_outfit_suggestions(image_path: Path | None = None, description: str
             # Step 1: Vision model — no JSON constraint, just describe what it sees
             vision_response = client.chat.completions.create(
                 model="qwen/qwen3.6-27b",   # currently the only model from groq that supports image as input
+                temperature=0.9,
                 messages=[
                     {
                         "role": "user",
