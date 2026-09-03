@@ -168,7 +168,7 @@ def generate_outfit_suggestions(image_path: Path | None = None, description: str
             client = Groq(api_key=api_key)
             # Step 1: Vision model — no JSON constraint, just describe what it sees
             vision_response = client.chat.completions.create(
-                model="qwen/qwen3.6-27b",   # currently the only model from groq that supports image as input
+                model="qwen/qwen3.8-27b",   # currently the only model from groq that supports image as input
                 temperature=0.9,
                 messages=[
                     {
