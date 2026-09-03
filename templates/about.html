@@ -2,15 +2,66 @@
 {% block content %}
 
 <h2>Outfit‑Buildr</h2>
-<p>Placeholder text about the Outfit‑Buildr project.</p>
+<p>
+    A classic strategy for making an outfit is to pick a piece you really want to wear and build around that item. 
+    My dream is for this app to help people explore styles that are new to them, get fresh perspectives on styles they already love, or
+    assist in styling that one piece that was bought forever ago, but never worn. 
+</p>
+<p>
+    I view it as an assistant that can help stimulate ideas and help people find their own voice through self expression.
+</p>
 
 <h2>Potential Use Cases</h2>
-<p>Placeholder text describing various use cases.</p>
+<ul>
+    <li>For fun, styling assistance: The user has a piece they want to wear and want some ideas on how it could be styled in a way
+         they might like.
+    </li>
+
+    <li>Virtual closet: This could be something that gets smarter over time. As the user adds more pieces, the model tries to
+     recommend outfits based on things they already have.
+    </li>
+
+    <li>E-commerce: An outfit is generated built around the piece the user has, then the model finds pieces for sale in the database
+     that would create that outfit.
+     <ul>
+        <li>
+            Several companies already include this functionality, though it is likely not powered by AI.
+        </li>
+        <li>
+            Companies that include "style with", "shop the look" or similar outfit building tech: Daydream, H&M, Urban Outfitters
+        </li>
+     </ul>
+    </li>
+</ul>
 
 <h2>Why Use AI?</h2>
-<p>Placeholder text explaining the benefits of AI.</p>
+<p>The reason the fashion industry is so large comes down to nuance. Personally, I own roughly 10 pairs of jeans. Half of them being
+     blue jeans. Simple metadata tags (e.g., blue, denim, pants, etc.) are not precise enough to capture what makes a piece worth wearing 
+     and what would compliment it. An AI with vision can pick the details that differentiate items that sound similar on paper. On top 
+     of that, it can be guided to an aesthetic a user is going for or enjoys wearing. A simple styling algorithm is constrained to 
+     what would satisfy the majority or basic principals (e.g., color theory). An AI assistant can be guided in a way that allows the 
+     user to maintain what makes them a unique individual that doesn't necessarily have to satisfy others.</p>
 
 <h2>Behind the Scenes</h2>
-<p>Placeholder text about the technical implementation.</p>
+<p>The actual tech powering the Outfit Buildr!</p>
+<p>
+    On the start page, the user decides weather they will upload an image of their item, or attempt to describe it. Once the user
+    adds their garment and optional aesthetic and weather info, this all gets passed into an LLM from Alibaba, 
+    <strong>Qwen3.6-27b</strong>, at the time of writing. This model is the only model available on Groq at the time of writing that
+    can take image as input. A custom prompt instructs the model to look at the image passed in and come up with 4 unique, cohesive
+    outfits.
+</p>
+<p>
+    After the Qwen model returns its response, this is directly passed to the <strong>openai/gpt-oss-20b</strong> model from OpenAI. 
+    At the time of writing, this is one of the only models from Groq that allows JSON schema enforcement for model outputs. The output 
+    from the Qwen model is forced to conform to the JSON schema that is expected by the html. This ensures consistency and avoids any 
+    problems related to unreliable syntax from LLM output. 
+</p>
+<p>
+    The final step, visualize, is powered by the CLIP model from OpenAI. This is a very powerful model that can find relevant results
+    in text to image or image to image search. In my workflow, the output of the LLM pipeline returns JSON that includes a property 
+    that lists each garment listed in the specific outfit that is to be visualized. The CLIP search can quickly find the most relevant 
+    pieces in the dataset and present them for the outfit visualization.
+</p>
 
 {% endblock %}
