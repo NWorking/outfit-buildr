@@ -18,13 +18,17 @@
         <img src="data:image/jpeg;base64,{{ uploaded_image_b64 }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
     </div>
     {% endif %}
-    
+
     <div class="visual-grid" style="display:flex;flex-wrap:wrap;gap:1rem;">
         {% for item in items %}
         <div class="visual-item" style="flex:1 1 200px; text-align:center;">
             <p><strong>{{ item.piece }}</strong></p>
             {% if item.image %}
-                <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
+                {% if item.image.startswith('http') %}
+                    <img src="{{ item.image }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
+                {% else %}
+                    <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
+                {% endif %}
             {% else %}
                 <p>No image found</p>
             {% endif %}

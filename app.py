@@ -10,6 +10,7 @@ import mimetypes
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 from image_retrieval import get_top_images as generate_images
+from image_retrieval import get_piece_image
 from groq import Groq
 
 from pydantic import BaseModel, ValidationError
@@ -41,7 +42,6 @@ def _parse_json_response(content: str) -> list[dict]:
     except (json.JSONDecodeError, ValidationError) as e:
         print('JSON parse/validation error:', e)
         return [{"title": "Raw suggestion", "reasoning": "", "pieces": [cleaned]}]
-
 
 
 def _clean_suggestions(content: str) -> list[str]:
@@ -98,12 +98,10 @@ def _build_vision_prompt(description: str | None) -> str:
         "only list complementary items that would be worn with it.\n\n"
         "Respond with ONLY a JSON array, no other text before or after, "
         "no markdown code fences. Follow this exact format:\n"
-        '[\n'
-        '  {"title": "Golden Hour Glow", "reasoning": "Warm neutrals and soft '
-        'textures complement the piece without competing.", "pieces": '
-        '["tan suede ankle boots", "oversized cardigan", "gold hoop earrings"]},\n'
-        '  {"title": "...", "reasoning": "...", "pieces": ["...", "..."]}\n'
-        ']\n'
+        "[\n"
+        "  {\"title\": \"Golden Hour Glow\", \"reasoning\": \"Warm neutrals and soft textures complement the piece without competing.\", \"pieces\": [\"tan suede ankle boots\", \"oversized cardigan\", \"gold hoop earrings\"]},\n"
+        "  {\"title\": \"...\", \"reasoning\": \"...\", \"pieces\": [\"...\", \"...\"]}\n"
+        "]\n"
         "Return exactly 4 objects in the array. Each object's \"pieces\" list "
         "should have 2-8 short, concrete, searchable item descriptions."
     )
@@ -131,16 +129,13 @@ def _build_text_prompt(description: str | None) -> str:
         prompt += f" The user prefers a {style} style."
     if weather:
         prompt += f" The current weather is {weather}."
-
     prompt += (
         "\n\nDo NOT include the original garment itself in the \"pieces\" list — "
         "only list other items in the outfit you come up with that would be worn with the original garment.\n\n"
         "Respond with ONLY the JSON array, no other text before or after, "
         "no markdown code fences. Follow the format defined by schema."
-        
     )
     return prompt
-
 
 def generate_outfit_suggestions(image_path: Path | None = None, description: str = "", schema:dict | None = None, provider: str = "ollama", response_format: dict | None = None, image_b64: str | None = None) -> tuple[list[dict], float]:
     """Generate outfit suggestions using Ollama's vision model.
@@ -155,7 +150,7 @@ def generate_outfit_suggestions(image_path: Path | None = None, description: str
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise RuntimeError("GROQ_API_KEY environment variable not set")
-        # Model choice – currently the only model from groq that supports image as input
+        # Model choice – currently the only model from groq that supports image input
         prompt_text = _build_vision_prompt(description)
         if image_path is not None:
             image_data_url = _encode_image(image_path)
@@ -208,7 +203,7 @@ def generate_outfit_suggestions(image_path: Path | None = None, description: str
         # Parse the JSON output from the LLM (same as Ollama path)
         suggestions = _parse_json_response(content)
         return suggestions, thinking_time
-    
+
     # Ollama
     else:
         try:
@@ -228,7 +223,7 @@ def generate_outfit_suggestions(image_path: Path | None = None, description: str
         # Parse JSON output from LLM
         suggestions = _parse_json_response(content)
         return suggestions, thinking_time
-        
+
 
 def generate_text_only_suggestions(description: str, schema: dict | None = None, provider="ollama", response_format: dict | None = None) -> list[dict]:
     """Generate outfit suggestions using a text‑only prompt.
@@ -245,7 +240,7 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
                 raise RuntimeError("GROQ_API_KEY environment variable not set")
             # Model choice – a fast, current chat model from Groq. Adjust if needed.
             groq_model = "openai/gpt-oss-20b"
-            
+
             try:
                 precall_time = time.time()
                 client = Groq(api_key=api_key)
@@ -286,7 +281,6 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
         return suggestions, thinking_time
 
 # Add a button on the select image page to add style/aesthetic description
-
 import re
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 
@@ -487,9 +481,9 @@ def visualize():
     pieces = suggestion.get("pieces", [])
     items = []
     for piece in pieces:
-        top = get_top_images(piece, top_k=1)
-        image = top[0] if top else None
-        items.append({"piece": piece, "image": image})
+        # Use live image search with CLIP reranking, falling back to local CLIP cache.
+        image_url = get_piece_image(piece)
+        items.append({"piece": piece, "image": image_url})
     uploaded_image_b64 = request.form.get('uploaded_image_b64')
     return render_template(
         "visualize.html",
