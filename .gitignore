@@ -6,9 +6,6 @@ venv/
 __pycache__/
 *.pyc
 
-# Project‑specific caches
-.image_cache/
-
 # Environment variable secrets
 .env
 .env.*
@@ -25,5 +22,5 @@ Thumbs.db
 *.log
 tmp/
 
-#images
-static/fashion/
+# runtime data that grows over time, may contain URLs tied to API usage
+live_image_cache_v2.json
