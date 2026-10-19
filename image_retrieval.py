@@ -28,6 +28,7 @@ from tqdm import tqdm
 import os
 import requests
 import io
+import redis
 from PIL import Image
 
 # ---------------------------------------------------------------------------
@@ -42,8 +43,6 @@ EMB_PATH = CACHE_DIR / f"embeddings_{CACHE_VERSION}.pt"
 PATHS_PATH = CACHE_DIR / f"paths_{CACHE_VERSION}.json"
 METADATA_PATH = CACHE_DIR / f"metadata_{CACHE_VERSION}.json"
 
-# Path for live‑search cache (description -> image URL)
-LIVE_CACHE_PATH = CACHE_DIR / f"live_image_cache_{CACHE_VERSION}.json"
 
 # Directory for low‑similarity logs
 LOGS_DIR = PROJECT_ROOT / "logs"
@@ -172,28 +171,12 @@ def _load_cache() -> tuple[torch.Tensor, List[str]]:
     return _download_and_cache()
 
 
-def _load_live_cache() -> dict:
-    """Load the JSON cache that maps piece descriptions to a remote image URL.
-    Returns an empty dict if the file does not exist or cannot be parsed.
-    """
-    if LIVE_CACHE_PATH.is_file():
-        try:
-            with open(LIVE_CACHE_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+def _redis_client():
+    return redis.from_url(os.getenv("REDIS_URL"))
 
+# TTL for cached image URLs (30 days)
+LIVE_CACHE_TTL = 30 * 24 * 3600
 
-def _save_live_cache(cache: dict) -> None:
-    """Write the live‑search cache back to disk.
-    Overwrites the whole file atomically via a temporary write.
-    """
-    try:
-        with open(LIVE_CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump(cache, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        print(f"[Live Image] Failed to write cache: {e}")
 
 
 def _text_embedding(text: str) -> torch.Tensor:
@@ -208,23 +191,29 @@ def get_piece_image(description: str) -> str:
     """Return the best‑matching image URL for a garment *description*.
 
     The function follows these steps:
-    1. Check a local JSON cache (``live_image_cache_…``) - if present, return it.
-    2. Call SerpApi's Google Images endpoint (engine=google_images) using the ``SERPAPI_KEY`` environment variable. Extract the ``images_results`` list.
-    3. Take the first few results (default 5) and re-rank them with the CLIP model against the *description* text. The highest-similarity image URL (the ``original`` field) is selected.
-    4. If the API call fails, returns no results, or none of the candidates can be processed, fall back to the existing local ``get_top_images`` (top_k=1).
-    5. Cache the successful mapping (description → image URL) for future calls.
+    1. Check a Redis cache (`piece_img:<normalized description>`) – if present, return it.
+    2. Call SerpApi's Google Images endpoint (engine=google_images) using the ``SERPAPI_KEY`` env var.
+    3. Take the first few results (default 5) and re‑rank them with the CLIP model against the description.
+    4. If no results or errors, fall back to the local ``get_top_images`` (top_k=1).
+    5. Cache the successful URL in Redis with a TTL of ~30 days.
 
-    Returns a string URL - either a remote ``http(s)://`` URL or a relative static path (e.g. ``"fashion/img_0012.jpg"``) when the CLIP fallback is used.
+    Returns a URL string – either a remote ``http(s)://`` URL or a relative static path (e.g. ``"fashion/img_0012.jpg"``) when the CLIP fallback is used.
     """
-    # 1️⃣ Cache check
-    cache = _load_live_cache()
-    if description in cache:
-        print(f"[Live Image] Cache hit for '{description}'")
-        return cache[description]
-    # 2️⃣ Prepare SerpApi request
+    # Normalise description for cache key
+    cache_key = f"piece_img:{description.lower().strip()}"
+    try:
+        client = _redis_client()
+        cached = client.get(cache_key)
+        if cached:
+            url = cached.decode()
+            print(f"[Live Image] Cache hit for '{description}'")
+            return url
+    except Exception as e:
+        print(f"[Live Image] Redis cache read error for '{description}': {e}")
+    # Prepare SerpApi request
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
-        print("[Live Image] SERPAPI_KEY not set - using CLIP fallback")
+        print("[Live Image] SERPAPI_KEY not set – using CLIP fallback")
         fallback = get_top_images(description, top_k=1)
         return fallback[0] if fallback else ""
     try:
@@ -234,22 +223,27 @@ def get_piece_image(description: str) -> str:
             "api_key": api_key,
             "num": "10",
         }
-        response = requests.get("https://serpapi.com/search.json", params=params, timeout=20)
+        response = requests.get("https://serpapi.com/search.json", params=params, timeout=15)
         response.raise_for_status()
         payload = response.json()
         results = payload.get("images_results", [])
     except Exception as e:
         print(f"[Live Image] API request failed for '{description}': {e}")
         results = []
-    # 3️⃣ No results → fallback
+    # No results → fallback
     if not results:
-        print(f"[Live Image] No results from SerpApi for '{description}' - CLIP fallback")
+        print(f"[Live Image] No results from SerpApi for '{description}' – CLIP fallback")
         fallback = get_top_images(description, top_k=1)
         url = fallback[0] if fallback else ""
+        if url:
+            try:
+                client.setex(cache_key, LIVE_CACHE_TTL, url)
+            except Exception as e:
+                print(f"[Live Image] Redis cache write error for fallback URL: {e}")
         return url
-    # 4️⃣ Re‑rank using CLIP (limit to first few candidates)
+    # Re‑rank using CLIP (first 5 candidates)
     top_candidates = results[:5]
-    txt_emb = _text_embedding(description)  # Shape: [1, D]
+    txt_emb = _text_embedding(description)
     best_score = -float("inf")
     best_url = None
     for cand in top_candidates:
@@ -273,13 +267,20 @@ def get_piece_image(description: str) -> str:
             continue
     if best_url:
         print(f"[Live Image] Selected URL for '{description}' (score {best_score:.4f})")
-        cache[description] = best_url
-        _save_live_cache(cache)
+        try:
+            client.setex(cache_key, LIVE_CACHE_TTL, best_url)
+        except Exception as e:
+            print(f"[Live Image] Redis cache write error for selected URL: {e}")
         return best_url
-    # 5️⃣ If all candidates failed, fallback to CLIP cache
-    print(f"[Live Image] All candidates failed for '{description}' - CLIP fallback")
+    # All candidates failed – fallback to CLIP cache
+    print(f"[Live Image] All candidates failed for '{description}' – CLIP fallback")
     fallback = get_top_images(description, top_k=1)
     url = fallback[0] if fallback else ""
+    if url:
+        try:
+            client.setex(cache_key, LIVE_CACHE_TTL, url)
+        except Exception as e:
+            print(f"[Live Image] Redis cache write error for final fallback URL: {e}")
     return url
 
 def get_top_images(description: str, top_k: int = 4, threshold: float = 0.25) -> List[str]:

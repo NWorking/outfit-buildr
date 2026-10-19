@@ -24,3 +24,8 @@ tmp/
 
 # runtime data that grows over time, may contain URLs tied to API usage
 live_image_cache_v2.json
+
+
+# DO NOT ADD IMAGE_CACHE TO THIS FILE
+# The images need to be baked in to render, as the description path depends on them AND SerpAPI quota is 250 req/month so
+# these images are a good fallback.

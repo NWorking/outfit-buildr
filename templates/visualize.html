@@ -7,15 +7,10 @@
         <img src="{{ url_for('static', filename=session.selected_image) }}" alt="Selected garment" style="max-width:400px; height:auto;"/>
     </div>
     {% endif %}
-    {% if uploaded_image_b64 %}
+    {% if session.get('uploaded_image') %}
     <div class="selected-garment" style="margin-bottom:1rem; text-align:center;">
         <p><strong>Original Garment</strong></p>
-        <img src="data:image/jpeg;base64,{{ uploaded_image_b64 }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
-    </div>
-    {% endif %}
-    {% if session.uploaded_image_b64 %}
-    <div class="selected-image" style="margin-bottom:1rem; text-align:center;">
-        <img src="data:image/jpeg;base64,{{ uploaded_image_b64 }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
+        <img src="{{ url_for('uploaded_image') }}" alt="Uploaded garment" style="max-width:400px; height:auto;"/>
     </div>
     {% endif %}
 

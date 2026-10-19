@@ -7,13 +7,22 @@ import time
 from pathlib import Path
 import base64
 import mimetypes
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+import io
+from datetime import timedelta
+import redis
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
+from flask_session import Session
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 from image_retrieval import get_top_images as generate_images
 from image_retrieval import get_piece_image
 from groq import Groq
+from PIL import Image
+
 
 from pydantic import BaseModel, ValidationError
+
+from dotenv import load_dotenv
+load_dotenv() 
 
 class Suggestion(BaseModel):
     title: str
@@ -285,13 +294,37 @@ import re
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
 
 app = Flask(__name__)
-# Simple secret key – in production use a secure random value.
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
+# Load secret key from environment – fail fast if missing
+secret_key = os.getenv("FLASK_SECRET_KEY")
+if not secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY environment variable is required")
+app.secret_key = secret_key
+
+# Configure Redis-backed server‑side sessions
+redis_url = os.getenv("REDIS_URL")
+if not redis_url:
+    raise RuntimeError("REDIS_URL environment variable is required for session storage")
+session_redis = redis.from_url(redis_url)
+app.config.update({
+    "SESSION_TYPE": "redis",
+    "SESSION_REDIS": session_redis,
+    "SESSION_KEY_PREFIX": "session:",
+    "PERMANENT_SESSION_LIFETIME": timedelta(hours=1),
+    "SESSION_PERMANENT": True,
+    "SESSION_COOKIE_HTTPONLY": True,
+    "SESSION_COOKIE_SAMESITE": "Lax",
+    # In production (debug=False) we want Secure cookies; in dev we keep them plain.
+    "SESSION_COOKIE_SECURE": not app.debug,
+})
+
+# Initialise Flask‑Session
+Session(app)
 
 # Ensure session works – set permanent session.
-app.config["SESSION_PERMANENT"] = False
+# (Flask‑Session already makes sessions permanent based on config above.)
+app.config["SESSION_PERMANENT"] = True
 # Limit upload size to 5 MB to prevent excessive memory usage.
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
 
 
 # Groq JSON output enforcer - only compatible with a few models (none support image input)
@@ -415,8 +448,19 @@ def suggestions():
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
-    flash("Uploaded file is too large (max 5 MB).")
+    flash("Uploaded file is too large (max 10 MB).")
     return redirect(url_for('index'))
+
+@app.route("/uploaded_image")
+def uploaded_image():
+    """Serve the downsized uploaded image stored in the session as raw bytes."""
+    b64 = session.get('uploaded_image')
+    mime = session.get('uploaded_image_mime')
+    if not b64 or not mime:
+        # No image in session – return 404.
+        return "", 404
+    data = base64.b64decode(b64)
+    return Response(data, mimetype=mime)
 
 @app.route("/upload_suggestions", methods=["POST"])
 def upload_suggestions():
@@ -429,14 +473,28 @@ def upload_suggestions():
     if not uploaded_file.mimetype or not uploaded_file.mimetype.startswith('image/'):
         flash("Uploaded file must be an image.")
         return redirect(url_for("index"))
-    # Read file bytes into memory and base64‑encode.
+    # Read file bytes into memory.
     file_bytes = uploaded_file.read()
     if not file_bytes:
         flash("Uploaded image is empty.")
         return redirect(url_for("index"))
-    b64_str = base64.b64encode(file_bytes).decode('utf-8')
-    # Build data URI for LLM (Groq vision model expects a data URL).
-    image_data_uri = f"data:{uploaded_file.mimetype};base64,{b64_str}"
+    # Open with Pillow, downsize to max 1024px on the longest side, convert to JPEG.
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        img = img.convert("RGB")
+        img.thumbnail((1024, 1024), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=80)
+        downsized_bytes = buf.getvalue()
+    except Exception as e:
+        flash(f"Failed to process image: {e}")
+        return redirect(url_for("index"))
+    # Store the downsized image in the session as base64.
+    b64_str = base64.b64encode(downsized_bytes).decode('utf-8')
+    session['uploaded_image'] = b64_str
+    session['uploaded_image_mime'] = 'image/jpeg'
+    # Build data URI for the LLM (Groq vision model expects a data URL).
+    image_data_uri = f"data:image/jpeg;base64,{b64_str}"
     # Preserve optional style and weather fields.
     style_preference = request.form.get('style_preference', '').strip()
     weather = request.form.get('weather', '').strip()
@@ -455,11 +513,10 @@ def upload_suggestions():
     )
     # Store suggestions for later visualization.
     session['outfit_suggestions'] = suggestions
-    # Render results directly, passing the base64 string for display.
+    # Render results directly – the template will pull the image from the session.
     return render_template(
         'results.html',
         selected_image=None,
-        uploaded_image_b64=b64_str,
         suggestions=suggestions,
         thinking_time=thinking_time,
     )
@@ -484,12 +541,11 @@ def visualize():
         # Use live image search with CLIP reranking, falling back to local CLIP cache.
         image_url = get_piece_image(piece)
         items.append({"piece": piece, "image": image_url})
-    uploaded_image_b64 = request.form.get('uploaded_image_b64')
+    # uploaded_image_b64 is no longer needed – the template pulls the image from the session
     return render_template(
         "visualize.html",
         suggestion=suggestion,
         items=items,
-        uploaded_image_b64=uploaded_image_b64,
     )
 
 @app.route("/about")
