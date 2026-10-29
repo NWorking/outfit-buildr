@@ -387,6 +387,9 @@ schema = {
 
 @app.route("/", methods=["GET"])
 def index():
+    # Clear any state from a previous run – this ensures old garment images (selected or uploaded)
+    # are not shown when the user starts a new session from the home page.
+    session.clear()
     return render_template("index.html")
 
 @app.route("/generate", methods=["POST"])
@@ -423,7 +426,11 @@ def suggestions():
         if not description:
             flash("Description is required for text‑only suggestions.")
             return redirect(url_for("index"))
-        suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="ollama", response_format=response_format)
+        try:
+            suggestions, thinking_time = generate_text_only_suggestions(description, schema, provider="groq", response_format=response_format)
+        except RuntimeError as e:
+            flash("Sorry, Groq is unavailable. Please try again later.")
+            return redirect(url_for("index"))
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
         # Text‑only mode does not have a selected image
@@ -435,7 +442,11 @@ def suggestions():
             return redirect(url_for("index"))
         session["selected_image"] = selected_image
         image_path = Path(IMAGE_STATIC_DIR) / selected_image
-        suggestions, thinking_time = generate_outfit_suggestions(image_path, description if description else None, schema=schema, provider="groq", response_format=response_format)
+        try:
+            suggestions, thinking_time = generate_outfit_suggestions(image_path, description if description else None, schema=schema, provider="groq", response_format=response_format)
+        except RuntimeError as e:
+            flash("Sorry, Groq is unavailable. Please try again later.")
+            return redirect(url_for("index"))
         # Store structured suggestions for later visualization
         session["outfit_suggestions"] = suggestions
     # Render results page with suggestions (and optional selected image)
@@ -554,4 +565,6 @@ def about():
 
 if __name__ == "__main__":
     # Run on default Flask port.
-    app.run(debug=True)
+    # This guarantees debug=False if this is run elsewhere
+    # prod server will not even run this block
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")
