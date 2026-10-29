@@ -40,11 +40,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # Bake CLIP weights into the image. This sits above "COPY . ." so code
 # changes don't trigger a re-download.
 ENV HF_HOME=/app/.cache TORCH_HOME=/app/.cache
-RUN python - <<'EOF'
-import open_clip
-open_clip.create_model_and_transforms("ViT-B-32", pretrained="openai")
-print("CLIP model cached")
-EOF
+RUN python -c "import open_clip; open_clip.create_model_and_transforms('ViT-B-32', pretrained='openai'); print('CLIP model cached')"
 
 # -------------------------------------------------------------
 # 5️⃣  Copy the source code (layers after deps for cache benefit)
