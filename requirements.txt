@@ -11,3 +11,4 @@ ollama>=0.6.2
 groq
 Flask-Session>=0.7.0
 redis>=4.0.0
+gunicorn

@@ -1,0 +1,31 @@
+# Git metadata
+.git
+.gitignore
+
+# Local virtual‑env / python caches
+venv/
+*.venv
+__pycache__/
+*.pyc
+
+# Secret files – must never be baked into the image
+.env
+
+# Log files (runtime only)
+logs/
+*.log
+
+# Live image‑cache that is regenerated at runtime – we keep the static
+# embeddings/paths/metadata files, but the live cache should stay out.
+.image_cache/live_image_cache_v2.json
+
+# Optional: local development artefacts that you don't want in the image
+*.sqlite3
+
+# Claude‑Code workspace
+.claude/
+
+# Operating‑system / editor artifacts
+*.DS_Store
+Thumbs.db
+*.swp
