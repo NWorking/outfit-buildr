@@ -12,9 +12,8 @@ from datetime import timedelta
 import redis
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 from flask_session import Session
-from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
+from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images, get_piece_image, serpapi_quota_exhausted
 from image_retrieval import get_top_images as generate_images
-from image_retrieval import get_piece_image
 from groq import Groq
 from PIL import Image
 
@@ -291,7 +290,7 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
 
 # Add a button on the select image page to add style/aesthetic description
 import re
-from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images
+from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images, get_piece_image, serpapi_quota_exhausted
 
 app = Flask(__name__)
 # Load secret key from environment – fail fast if missing
@@ -390,7 +389,8 @@ def index():
     # Clear any state from a previous run – this ensures old garment images (selected or uploaded)
     # are not shown when the user starts a new session from the home page.
     session.clear()
-    return render_template("index.html")
+    quota_exhausted = serpapi_quota_exhausted()
+    return render_template("index.html", serpapi_quota_exhausted=quota_exhausted)
 
 @app.route("/generate", methods=["POST"])
 def generate():

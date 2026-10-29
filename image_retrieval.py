@@ -172,7 +172,33 @@ def _load_cache() -> tuple[torch.Tensor, List[str]]:
 
 
 def _redis_client():
+    """Create a Redis client from the REDIS_URL env var."""
     return redis.from_url(os.getenv("REDIS_URL"))
+
+
+def serpapi_quota_exhausted() -> bool:
+    """Return True if the current month's SerpApi call quota has been reached.
+
+    The count is stored in Redis under the key ``serpapi_calls:<YYYY-MM>``.
+    If the key does not exist or any Redis error occurs, we assume the quota
+    has **not** been exhausted and return ``False``.
+    """
+    try:
+        client = _redis_client()
+        now = datetime.utcnow()
+        key = f"serpapi_calls:{now.year:04d}-{now.month:02d}"
+        raw = client.get(key)
+        if raw is None:
+            return False
+        count = int(raw.decode())
+        return count >= SERPAPI_MONTHLY_CAP
+    except Exception:
+        # On any error (Redis unavailable, bad data, etc.) treat as not exhausted.
+        return False
+
+
+# Monthly cap for SerpApi calls – can be set via env var or overridden here.
+SERPAPI_MONTHLY_CAP = int(os.getenv("SERPAPI_MONTHLY_CAP", "1000"))
 
 # TTL for cached image URLs (30 days)
 LIVE_CACHE_TTL = 30 * 24 * 3600
