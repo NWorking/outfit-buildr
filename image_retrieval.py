@@ -1,4 +1,5 @@
-"""Image retrieval module using CLIP embeddings from the ashraq/fashion-product-images-small dataset.
+"""
+Image retrieval module using CLIP embeddings from the ashraq/fashion-product-images-small dataset.
 
 This module provides ``get_top_images`` which returns
 four image file paths that best match a garment description. The implementation
@@ -185,7 +186,7 @@ def serpapi_quota_exhausted() -> bool:
     """
     try:
         client = _redis_client()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         key = f"serpapi_calls:{now.year:04d}-{now.month:02d}"
         raw = client.get(key)
         if raw is None:
@@ -217,9 +218,9 @@ def get_piece_image(description: str) -> str:
     """Return the best‑matching image URL for a garment *description*.
 
     The function follows these steps:
-    1. Check a Redis cache (`piece_img:<normalized description>`) – if present, return it.
+    1. Check a Redis cache (`piece_img:<normalized description>`) - if present, return it.
     2. Call SerpApi's Google Images endpoint (engine=google_images) using the ``SERPAPI_KEY`` env var.
-    3. Take the first few results (default 5) and re‑rank them with the CLIP model against the description.
+    3. Take the first few results (default 5) and re-rank them with the CLIP model against the description.
     4. If no results or errors, fall back to the local ``get_top_images`` (top_k=1).
     5. Cache the successful URL in Redis with a TTL of ~30 days.
 
@@ -313,10 +314,10 @@ def get_top_images(description: str, top_k: int = 4, threshold: float = 0.25) ->
     """Return the *top_k* image paths whose CLIP embeddings are closest to *description*.
 
     Args:
-        description: Free‑form garment description supplied by the user.
+        description: Free-form garment description supplied by the user.
         top_k: Number of images to return (default 4 to match the UI).
     Returns:
-        List of relative static‑folder paths (e.g. ``"fashion/img_0012.jpg"``).
+        List of relative static-folder paths (e.g. ``"fashion/img_0012.jpg"``).
     """
     embeddings, rel_paths = _load_cache()
     txt_emb = _text_embedding(description)  # Shape: [1, D]

@@ -20,9 +20,9 @@
             <p><strong>{{ item.piece }}</strong></p>
             {% if item.image %}
                 {% if item.image.startswith('http') %}
-                    <img src="{{ item.image }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
+                    <img src="{{ item.image }}" alt="{{ item.piece }}" style="max-width:250px; max-height:250px; object-fit:contain;"/>
                 {% else %}
-                    <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.piece }}" style="max-width:100%;height:auto;"/>
+                    <img src="{{ url_for('static', filename=item.image) }}" alt="{{ item.piece }}" style="max-width:250px; max-height:250px; object-fit:contain;"/>
                 {% endif %}
             {% else %}
                 <p>No image found</p>

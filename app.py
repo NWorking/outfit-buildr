@@ -12,7 +12,7 @@ from datetime import timedelta
 import redis
 from flask import Flask, render_template, request, redirect, url_for, session, flash, Response
 from flask_session import Session
-from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images, get_piece_image, serpapi_quota_exhausted
+from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_piece_image, serpapi_quota_exhausted
 from image_retrieval import get_top_images as generate_images
 from groq import Groq
 from PIL import Image
@@ -288,9 +288,6 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
         suggestions = _parse_json_response(content)
         return suggestions, thinking_time
 
-# Add a button on the select image page to add style/aesthetic description
-import re
-from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_top_images, get_piece_image, serpapi_quota_exhausted
 
 app = Flask(__name__)
 # Load secret key from environment – fail fast if missing
