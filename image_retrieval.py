@@ -28,6 +28,8 @@ from tqdm import tqdm
 # New imports for live image search
 import os
 import requests
+import logging
+logger = logging.getLogger(__name__)
 import io
 import redis
 from PIL import Image
@@ -233,14 +235,14 @@ def get_piece_image(description: str) -> str:
         cached = client.get(cache_key)
         if cached:
             url = cached.decode()
-            print(f"[Live Image] Cache hit for '{description}'")
+            logger.debug("[Live Image] Cache hit for %s", description)
             return url
     except Exception as e:
-        print(f"[Live Image] Redis cache read error for '{description}': {e}")
+        logger.error("[Live Image] Redis cache read error for %s: %s", description, e)
     # Prepare SerpApi request
     api_key = os.getenv("SERPAPI_KEY")
     if not api_key:
-        print("[Live Image] SERPAPI_KEY not set – using CLIP fallback")
+        logger.info("[Live Image] SERPAPI_KEY not set – using CLIP fallback")
         fallback = get_top_images(description, top_k=1)
         return fallback[0] if fallback else ""
     try:
@@ -255,18 +257,18 @@ def get_piece_image(description: str) -> str:
         payload = response.json()
         results = payload.get("images_results", [])
     except Exception as e:
-        print(f"[Live Image] API request failed for '{description}': {e}")
+        logger.error("[Live Image] API request failed for %s: %s", description, e)
         results = []
     # No results → fallback
     if not results:
-        print(f"[Live Image] No results from SerpApi for '{description}' – CLIP fallback")
+        logger.info("[Live Image] No results from SerpApi for %s - CLIP fallback", description)
         fallback = get_top_images(description, top_k=1)
         url = fallback[0] if fallback else ""
         if url:
             try:
                 client.setex(cache_key, LIVE_CACHE_TTL, url)
             except Exception as e:
-                print(f"[Live Image] Redis cache write error for fallback URL: {e}")
+                logger.error("[Live Image] Redis cache write error for fallback URL: %s", e)
         return url
     # Re‑rank using CLIP (first 5 candidates)
     top_candidates = results[:5]
@@ -290,24 +292,24 @@ def get_piece_image(description: str) -> str:
                 best_score = sim
                 best_url = img_url
         except Exception as e:
-            print(f"[Live Image] Failed to process candidate {img_url}: {e}")
+            logger.warning("[Live Image] Failed to process candidate %s: %s", img_url, e)
             continue
     if best_url:
-        print(f"[Live Image] Selected URL for '{description}' (score {best_score:.4f})")
+        logger.info("[Live Image] Selected URL for %s (score %.4f)", description, best_score)
         try:
             client.setex(cache_key, LIVE_CACHE_TTL, best_url)
         except Exception as e:
-            print(f"[Live Image] Redis cache write error for selected URL: {e}")
+            logger.error("[Live Image] Redis cache write error for selected URL: %s", e)
         return best_url
     # All candidates failed – fallback to CLIP cache
-    print(f"[Live Image] All candidates failed for '{description}' – CLIP fallback")
+    logger.warning("[Live Image] All candidates failed for %s – CLIP fallback", description)
     fallback = get_top_images(description, top_k=1)
     url = fallback[0] if fallback else ""
     if url:
         try:
             client.setex(cache_key, LIVE_CACHE_TTL, url)
         except Exception as e:
-            print(f"[Live Image] Redis cache write error for final fallback URL: {e}")
+            logger.error("[Live Image] Redis cache write error for final fallback URL: %s", e)
     return url
 
 def get_top_images(description: str, top_k: int = 4, threshold: float = 0.25) -> List[str]:

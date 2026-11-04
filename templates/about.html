@@ -44,8 +44,9 @@
 
 <h2>Behind the Scenes</h2>
 <p>The actual tech powering the Outfit Buildr!</p>
+<h3>LLM Pipeline</h3>
 <p>
-    On the start page, the user decides weather they will upload an image of their item, or attempt to describe it. Once the user
+    On the start page, the user decides whether they will upload an image of their item, or attempt to describe it. Once the user
     adds their garment and optional aesthetic and weather info, this all gets passed into an LLM from Alibaba, 
     <strong>Qwen3.6-27b</strong>, at the time of writing. This model is the only model available on Groq at the time of writing that
     can take image as input. A custom prompt instructs the model to look at the image passed in and come up with 4 unique, cohesive
@@ -58,10 +59,11 @@
     problems related to unreliable syntax from LLM output. 
 </p>
 <p>
-    The final step, visualize, is powered by the CLIP model from OpenAI. This is a very powerful model that can find relevant results
+    The final step, visualize, is powered by the CLIP model from OpenAI. This is a very powerful pre-trained model that can find relevant results
     in text to image or image to image search. In my workflow, the output of the LLM pipeline returns JSON that includes a property 
     that lists each garment listed in the specific outfit that is to be visualized. The CLIP search can quickly find the most relevant 
     pieces in the dataset and present them for the outfit visualization.
 </p>
+
 
 {% endblock %}

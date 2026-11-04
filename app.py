@@ -15,7 +15,16 @@ from flask_session import Session
 from image_retrieval import STATIC_DIR as IMAGE_STATIC_DIR, get_piece_image, serpapi_quota_exhausted
 from image_retrieval import get_top_images as generate_images
 from groq import Groq
+import sys
+
+import logging
+logging.basicConfig(level=os.getenv("LOG_LEVEL","INFO"),
+                    format="%(levelname)s %(name)s: %(message)s",
+                    stream=sys.stdout)
+logger = logging.getLogger(__name__)
+
 from PIL import Image
+Image.MAX_IMAGE_PIXELS = 25_000_000
 
 
 from pydantic import BaseModel, ValidationError
@@ -43,12 +52,12 @@ def _parse_json_response(content: str) -> list[dict]:
         if isinstance(data, dict) and "suggestions" in data:
             data = data["suggestions"]  # unwrap Groq's schema wrapper
         if not isinstance(data, list):
-            print('Unexpected JSON structure:', data)
+            logger.error("Unexpected JSON structure: %s", data)
             return []
         validated = [Suggestion.model_validate(item).model_dump() for item in data]
         return validated
     except (json.JSONDecodeError, ValidationError) as e:
-        print('JSON parse/validation error:', e)
+        logger.error("JSON parse/validation error: %s", e)
         return [{"title": "Raw suggestion", "reasoning": "", "pieces": [cleaned]}]
 
 
@@ -280,8 +289,6 @@ def generate_text_only_suggestions(description: str, schema: dict | None = None,
             )
             postcall_time = time.time()
             thinking_time = round(postcall_time - precall_time, 2)
-            print("RAW RESPONSE:", response, flush=True)
-            print("TIME: ", thinking_time, flush = True)
         except Exception as e:
             raise RuntimeError(f"Ollama text‑only model call failed: {e}")
         content = response.get("message", {}).get("content", "")
@@ -413,7 +420,6 @@ def suggestions():
     mode = request.form.get("mode", "vision")
     # DEBUG PRINT MODEL MODE
     mode = request.form.get("mode")
-    print(f"MODE RECEIVED: {mode!r}", flush=True)
     # The garment description is stored in the session from the /generate step.
     description = session.get("description", "")
     # The selected image radio button is always present in the form.
@@ -494,6 +500,9 @@ def upload_suggestions():
         buf = io.BytesIO()
         img.save(buf, format="JPEG", quality=80)
         downsized_bytes = buf.getvalue()
+    except Image.DecompressionBombError:
+        flash("Image too large, please upload a smaller photo")
+        return redirect(url_for("index"))
     except Exception as e:
         flash(f"Failed to process image: {e}")
         return redirect(url_for("index"))

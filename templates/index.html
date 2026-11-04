@@ -47,6 +47,9 @@
     <h2>Upload a photo of your garment</h2>
     <form method="post" action="{{ url_for('upload_suggestions') }}" enctype="multipart/form-data">
       <input type="file" name="photo" id="photo" accept="image/*" required />
+      <p class="upload-note" style="font-size:0.85rem; color:#555; margin-top:0.5rem; margin-bottom:0.5rem;">
+        Photos are sent to Groq for analysis and held in a temporary session for up to an hour. They are never saved to disk.
+      </p>
 <img id="photo-preview" src="#" alt="Preview" style="display:none; max-width:200px; margin-top:10px;" />
       <h3>Style preference (optional)</h3>
       <input type="text" name="style_preference" placeholder="e.g. minimalist, streetwear, business casual" />
