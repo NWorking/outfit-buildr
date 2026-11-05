@@ -45,19 +45,20 @@ flowchart TD
     A[User visits /] --> B{Select mode}
     B -->|Description| C[POST /generate]
     B -->|Upload photo| D[POST /upload_suggestions]
-    C --> E[generate_images() - CLIP cache]
-    D --> F[Resize - base64 - Groq vision]
-    E --> G[choose_image.html (4 candidates)]
+    C --> E["generate_images() - CLIP cache"]
+    D --> F["Resize - base64 - Groq vision"]
+    E --> G["choose_image.html (4 candidates)"]
     G --> H[POST /suggestions]
     F --> H
     H --> I{Provider}
-    I -->|vision| J[generate_outfit_suggestions()]
-    I -->|text_only| K[generate_text_only_suggestions()]
-    J & K --> L[Store suggestions in session]
-    L --> M[results.html (cards + "Visualize" button)]
+    I -->|vision| J["generate_outfit_suggestions()"]
+    I -->|text_only| K["generate_text_only_suggestions()"]
+    J --> L[Store suggestions in session]
+    K --> L
+    L --> M["results.html (cards + 'Visualize' button)"]
     M --> N[POST /visualize]
-    N --> O[get_piece_image() – SerpAPI + CLIP re‑rank]
-    O --> P[visualize.html (piece images + garment preview)]
+    N --> O["get_piece_image() - SerpAPI + CLIP re-rank"]
+    O --> P["visualize.html (piece images + garment preview)"]
 ```
 
 ---
