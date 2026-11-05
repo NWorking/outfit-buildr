@@ -45,8 +45,8 @@ flowchart TD
     A[User visits /] --> B{Select mode}
     B -->|Description| C[POST /generate]
     B -->|Upload photo| D[POST /upload_suggestions]
-    C --> E[generate_images() → CLIP cache]
-    D --> F[Resize → base64 → Groq vision]
+    C --> E[generate_images() - CLIP cache]
+    D --> F[Resize - base64 - Groq vision]
     E --> G[choose_image.html (4 candidates)]
     G --> H[POST /suggestions]
     F --> H
